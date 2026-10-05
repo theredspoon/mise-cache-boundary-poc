@@ -1,0 +1,62 @@
+name: pr-target-write-worstcase
+on:
+  pull_request_target:
+
+jobs:
+  write-cache:
+    runs-on: ubuntu-latest
+    # Deliberate worst-case opt-out: pull_request_target is a documented
+    # low-trust trigger that defaults to read-only cache access when it
+    # resolves to the default branch. cache-mode: write explicitly overrides
+    # that secure default, per
+    # https://docs.github.com/en/actions/reference/workflows-and-actions/dependency-caching#bypassing-the-default-untrusted-trigger-cache-restriction
+    cache-mode: write
+    permissions:
+      contents: read
+    env:
+      MISE_DATA_DIR: ${{ github.workspace }}/mise-data
+      MISE_CACHE_DIR: ${{ github.workspace }}/mise-cache
+      MISE_YES: "1"
+    steps:
+      # Deliberately checking out the base ref (default checkout behavior),
+      # NOT the PR head. We are not testing the "attacker-controlled code
+      # runs in base-repo context" pattern, only the cache write/restore
+      # boundary itself.
+      - uses: actions/checkout@v4
+
+      - name: install mise
+        run: |
+          curl https://mise.run | sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: trust config
+        run: mise trust
+
+      - name: mise install (legitimate)
+        run: mise install
+
+      - name: tamper installed binary at its real install path
+        run: |
+          INSTALL_PATH="$MISE_DATA_DIR/installs/github-theredspoon-widget/1.0.0/widget"
+          echo "--- before tamper ---"
+          sha256sum "$INSTALL_PATH"
+          cp "$(command -v echo)" "$INSTALL_PATH"
+          chmod +x "$INSTALL_PATH"
+          echo "--- after tamper ---"
+          sha256sum "$INSTALL_PATH"
+          "$INSTALL_PATH" TAMPER-MARKER-FROM-PR-TARGET-JOB
+
+      - name: save tampered install dir to Actions cache (worst-case key)
+        id: cache-save
+        uses: actions/cache/save@v4
+        with:
+          path: mise-data/installs
+          key: mise-boundary-poc-worstcase-v1
+
+      - name: report
+        env:
+          TRIGGER: ${{ github.event_name }}
+          REF: ${{ github.ref }}
+        run: |
+          echo "attempted cache save under key mise-boundary-poc-worstcase-v1 with cache-mode: write override"
+          echo "trigger=$TRIGGER ref=$REF"

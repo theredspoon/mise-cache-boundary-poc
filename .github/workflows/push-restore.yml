@@ -1,0 +1,99 @@
+name: push-restore
+on:
+  push:
+    branches: [main]
+
+jobs:
+  restore-realistic:
+    runs-on: ubuntu-latest
+    env:
+      MISE_DATA_DIR: ${{ github.workspace }}/mise-data
+      MISE_CACHE_DIR: ${{ github.workspace }}/mise-cache
+      MISE_YES: "1"
+      MISE_PARANOID: "1"
+      MISE_LOCKED_VERIFY_PROVENANCE: "1"
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: restore cache written by pull_request job (realistic key)
+        id: restore
+        uses: actions/cache/restore@v4
+        with:
+          path: mise-data/installs
+          key: mise-boundary-poc-realistic-v1
+
+      - name: report restore result
+        env:
+          CACHE_HIT: ${{ steps.restore.outputs.cache-hit }}
+        run: echo "cache-hit=$CACHE_HIT"
+
+      - name: install mise
+        if: steps.restore.outputs.cache-hit == 'true'
+        run: |
+          curl https://mise.run | sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: trust config
+        if: steps.restore.outputs.cache-hit == 'true'
+        run: mise trust
+
+      - name: mise install --locked (paranoid, provenance-verified)
+        if: steps.restore.outputs.cache-hit == 'true'
+        run: mise install --locked
+
+      - name: inspect what actually runs
+        if: steps.restore.outputs.cache-hit == 'true'
+        run: |
+          INSTALL_PATH="$MISE_DATA_DIR/installs/github-theredspoon-widget/1.0.0/widget"
+          echo "sha256 of install path after mise install --locked:"
+          sha256sum "$INSTALL_PATH"
+          echo "expected legitimate sha256 (from mise.lock): 22de9a7e5ed05c42f43bd565fcd48539e753ae47152dc5ce2e31bf62df0b6d98"
+          chmod +x "$INSTALL_PATH" 2>/dev/null || true
+          "$INSTALL_PATH" EXECUTION-TEST-FROM-PRIVILEGED-PUSH-JOB || true
+
+  restore-worstcase:
+    runs-on: ubuntu-latest
+    env:
+      MISE_DATA_DIR: ${{ github.workspace }}/mise-data
+      MISE_CACHE_DIR: ${{ github.workspace }}/mise-cache
+      MISE_YES: "1"
+      MISE_PARANOID: "1"
+      MISE_LOCKED_VERIFY_PROVENANCE: "1"
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: restore cache written by pull_request_target job (worst-case key)
+        id: restore
+        uses: actions/cache/restore@v4
+        with:
+          path: mise-data/installs
+          key: mise-boundary-poc-worstcase-v1
+
+      - name: report restore result
+        env:
+          CACHE_HIT: ${{ steps.restore.outputs.cache-hit }}
+        run: echo "cache-hit=$CACHE_HIT"
+
+      - name: install mise
+        if: steps.restore.outputs.cache-hit == 'true'
+        run: |
+          curl https://mise.run | sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: trust config
+        if: steps.restore.outputs.cache-hit == 'true'
+        run: mise trust
+
+      - name: mise install --locked (paranoid, provenance-verified)
+        if: steps.restore.outputs.cache-hit == 'true'
+        run: mise install --locked
+
+      - name: inspect what actually runs
+        if: steps.restore.outputs.cache-hit == 'true'
+        run: |
+          INSTALL_PATH="$MISE_DATA_DIR/installs/github-theredspoon-widget/1.0.0/widget"
+          echo "sha256 of install path after mise install --locked:"
+          sha256sum "$INSTALL_PATH"
+          echo "expected legitimate sha256 (from mise.lock): 22de9a7e5ed05c42f43bd565fcd48539e753ae47152dc5ce2e31bf62df0b6d98"
+          chmod +x "$INSTALL_PATH" 2>/dev/null || true
+          "$INSTALL_PATH" EXECUTION-TEST-FROM-PRIVILEGED-PUSH-JOB || true
