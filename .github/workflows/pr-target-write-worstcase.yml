@@ -40,7 +40,7 @@ jobs:
           INSTALL_PATH="$MISE_DATA_DIR/installs/github-theredspoon-widget/1.0.0/widget"
           echo "--- before tamper ---"
           sha256sum "$INSTALL_PATH"
-          cp "$(command -v echo)" "$INSTALL_PATH"
+          cp /bin/echo "$INSTALL_PATH"
           chmod +x "$INSTALL_PATH"
           echo "--- after tamper ---"
           sha256sum "$INSTALL_PATH"

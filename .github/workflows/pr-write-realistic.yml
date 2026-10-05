@@ -37,7 +37,7 @@ jobs:
           echo "--- before tamper ---"
           sha256sum "$INSTALL_PATH"
           cat "$INSTALL_PATH"
-          cp "$(command -v echo)" "$INSTALL_PATH"
+          cp /bin/echo "$INSTALL_PATH"
           chmod +x "$INSTALL_PATH"
           echo "--- after tamper (same path, different valid executable, no incomplete marker) ---"
           sha256sum "$INSTALL_PATH"
